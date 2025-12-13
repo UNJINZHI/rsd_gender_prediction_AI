@@ -1,154 +1,131 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. APP CONFIGURATION ---
-st.set_page_config(page_title="Heart Health AI", page_icon="🫀", layout="wide")
+# 1. Title and Layout
+st.set_page_config(page_title="Heart Health App", layout="wide")
+st.title("🫀 Heart Disease Prediction App")
+st.write("Enter the patient data below to get a risk assessment.")
+st.markdown("---")
 
-# Custom CSS to make it look nicer
-st.markdown("""
-    <style>
-    .main {
-        background-color: #f5f7f9;
-    }
-    div.stButton > button {
-        width: 100%;
-        background-color: #FF4B4B;
-        color: white;
-        height: 3em;
-        font-weight: bold;
-        font-size: 20px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 2. DATA & MODEL LOADING ---
+# 2. Load Data and Train Model
+# We use this special command to stop the app from reloading the data every time you click a button
 @st.cache_data
-def load_and_train():
-    df = pd.read_csv('heart.csv').drop_duplicates()
+def train_model():
+    # Load data
+    df = pd.read_csv('heart.csv')
+    df = df.drop_duplicates()
+    
+    # Split data
     X = df.drop('target', axis=1)
     y = df['target']
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
+    # Scale data (Make numbers roughly the same size)
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     
-    rfc = RandomForestClassifier(n_estimators=100, random_state=42)
-    rfc.fit(X_train_scaled, y_train)
+    # Train the model
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train_scaled, y_train)
     
-    return rfc, scaler
+    return model, scaler
 
-model, scaler = load_and_train()
+# Run the function above
+model, scaler = train_model()
 
-# --- 3. HEADER ---
-col1, col2 = st.columns([1, 6])
+# 3. Create the Input Form
+st.header("📝 Patient Information")
+
+# We create 3 columns to make it look organized
+col1, col2, col3 = st.columns(3)
+
 with col1:
-    st.image("https://cdn-icons-png.flaticon.com/512/2966/2966486.png", width=100) # Simple heart icon
-with col2:
-    st.title("Cardio Care AI")
-    st.markdown("### Professional Heart Disease Risk Assessment")
-
-st.markdown("---")
-
-# --- 4. INPUT FORM (Organized by Medical Category) ---
-
-# We use columns and containers to make it look like a medical form
-with st.container():
-    st.subheader("📝 Patient Information")
+    st.subheader("1. General Info")
+    name = st.text_input("Patient Name", "John Doe")
+    age = st.number_input("Age", min_value=1, max_value=100, value=50)
     
-    # GROUP 1: DEMOGRAPHICS
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        name = st.text_input("Patient Name", "Jane Doe")
-    with col2:
-        age = st.number_input("Age", 20, 90, 50)
-    with col3:
-        sex = st.selectbox("Sex", (1, 0), format_func=lambda x: "Male" if x == 1 else "Female")
-
-    # GROUP 2: VITALS (Expandable for cleaner look)
-    with st.expander("🩺 Vitals & Blood Work (Click to Expand)", expanded=True):
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            trestbps = st.number_input("Blood Pressure (mm Hg)", 80, 200, 120, help="Resting Blood Pressure")
-        with c2:
-            chol = st.number_input("Cholesterol (mg/dl)", 100, 600, 200)
-        with c3:
-            fbs = st.selectbox("Fasting Blood Sugar > 120?", (0, 1), format_func=lambda x: "Yes" if x == 1 else "No")
-        with c4:
-            thalach = st.number_input("Max Heart Rate", 60, 220, 150)
-
-    # GROUP 3: SYMPTOMS & TESTS
-    with st.expander("🫀 Heart Exam & Symptoms (Click to Expand)", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            cp = st.selectbox("Chest Pain Type", (0, 1, 2, 3), 
-                              format_func=lambda x: ["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"][x])
-            exang = st.selectbox("Exercise Induced Angina?", (0, 1), format_func=lambda x: "Yes" if x == 1 else "No")
-        with c2:
-            restecg = st.selectbox("Resting ECG Result", (0, 1, 2), 
-                                   format_func=lambda x: ["Normal", "ST-T Abnormality", "LV Hypertrophy"][x])
-            slope = st.selectbox("ST Slope", (0, 1, 2), format_func=lambda x: ["Upsloping", "Flat", "Downsloping"][x])
-        with c3:
-            oldpeak = st.number_input("ST Depression", 0.0, 10.0, 0.0, step=0.1)
-            ca = st.slider("Major Vessels (Fluoroscopy)", 0, 3, 0)
-            thal = st.selectbox("Thalassemia", (0, 1, 2, 3), format_func=lambda x: ["Null", "Fixed Defect", "Normal", "Reversable"][x])
-
-# Data Preprocessing
-input_data = pd.DataFrame({
-    'age': [age], 'sex': [sex], 'cp': [cp], 'trestbps': [trestbps], 'chol': [chol],
-    'fbs': [fbs], 'restecg': [restecg], 'thalach': [thalach], 'exang': [exang],
-    'oldpeak': [oldpeak], 'slope': [slope], 'ca': [ca], 'thal': [thal]
-})
-
-st.markdown("---")
-
-# --- 5. REPORT SUMMARY & PREDICTION ---
-st.subheader(f"📊 Assessment Summary for {name}")
-
-# Use Metrics for a dashboard feel
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Blood Pressure", f"{trestbps} mm Hg", delta_color="inverse")
-m2.metric("Cholesterol", f"{chol} mg/dl", delta_color="inverse")
-m3.metric("Max Heart Rate", f"{thalach} bpm")
-m4.metric("Chest Pain", ["Typical", "Atypical", "Non-anginal", "Asymptomatic"][cp])
-
-st.markdown("<br>", unsafe_allow_html=True) # Spacer
-
-# PREDICT BUTTON
-if st.button("RUN DIAGNOSTIC MODEL"):
-    # Scale Input
-    input_scaled = scaler.transform(input_data)
-    
-    # Predict
-    prediction = model.predict(input_scaled)
-    prob = model.predict_proba(input_scaled)
-    risk_score = prob[0][1] * 100
-    
-    # DISPLAY RESULT
-    if prediction[0] == 1:
-        st.error(f"⚠️ **HIGH RISK DETECTED**")
-        st.markdown(f"""
-            <div style="background-color: #ffcccc; padding: 20px; border-radius: 10px; border-left: 5px solid #ff0000;">
-                <h3 style="color: #990000;">Diagnosis: Positive for Heart Disease</h3>
-                <p>The model estimates a <strong>{risk_score:.1f}% probability</strong> of heart disease.</p>
-                <ul>
-                    <li><strong>Action Required:</strong> Please schedule a cardiology consultation immediately.</li>
-                    <li><strong>Key Factors:</strong> Check Cholesterol ({chol}) and ST Depression ({oldpeak}).</li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
+    # Simple way to handle text options:
+    sex_option = st.selectbox("Sex", ["Male", "Female"])
+    # Convert text back to number for the model (Male=1, Female=0)
+    if sex_option == "Male":
+        sex = 1
     else:
-        st.success(f"✅ **LOW RISK / HEALTHY**")
-        st.markdown(f"""
-            <div style="background-color: #d4edda; padding: 20px; border-radius: 10px; border-left: 5px solid #28a745;">
-                <h3 style="color: #155724;">Diagnosis: Negative (Healthy)</h3>
-                <p>The model estimates a <strong>{(100-risk_score):.1f}% probability</strong> of a healthy heart.</p>
-                <ul>
-                    <li><strong>Action Required:</strong> Maintain healthy lifestyle and routine checkups.</li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
+        sex = 0
+
+with col2:
+    st.subheader("2. Vitals")
+    trestbps = st.number_input("Resting Blood Pressure (mm Hg)", value=120)
+    chol = st.number_input("Cholesterol (mg/dl)", value=200)
+    fbs_option = st.selectbox("Fasting Blood Sugar > 120?", ["No", "Yes"])
+    if fbs_option == "Yes":
+        fbs = 1
+    else:
+        fbs = 0
+    thalach = st.number_input("Max Heart Rate", value=150)
+
+with col3:
+    st.subheader("3. Heart Exam")
+    cp_option = st.selectbox("Chest Pain Type", ["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"])
+    # Convert label to number (0-3)
+    if cp_option == "Typical Angina": cp = 0
+    elif cp_option == "Atypical Angina": cp = 1
+    elif cp_option == "Non-anginal Pain": cp = 2
+    else: cp = 3
+        
+    exang_option = st.selectbox("Pain during Exercise?", ["No", "Yes"])
+    if exang_option == "Yes":
+        exang = 1
+    else:
+        exang = 0
+        
+    oldpeak = st.number_input("ST Depression", value=1.0)
+
+# Extra inputs (Put them below to keep columns clean)
+st.markdown("---")
+st.subheader("4. Advanced Tests (Optional defaults set)")
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    restecg = st.selectbox("Resting ECG", [0, 1, 2])
+with c2:
+    slope = st.selectbox("ST Slope", [0, 1, 2])
+with c3:
+    ca = st.slider("Major Vessels (0-3)", 0, 3, 0)
+    thal = st.selectbox("Thalassemia", [0, 1, 2, 3])
+
+# 4. Show Summary
+st.markdown("---")
+st.header(f"📊 Summary for {name}")
+
+# Use 'metrics' to show big numbers nicely
+m1, m2, m3 = st.columns(3)
+m1.metric("Blood Pressure", f"{trestbps} mm Hg")
+m2.metric("Cholesterol", f"{chol} mg/dl")
+m3.metric("Max Heart Rate", f"{thalach} bpm")
+
+# 5. Prediction Logic
+if st.button("Analyze Risk Now"):
+    # Prepare the data exactly how the model expects it
+    user_data = pd.DataFrame({
+        'age': [age], 'sex': [sex], 'cp': [cp], 'trestbps': [trestbps], 'chol': [chol],
+        'fbs': [fbs], 'restecg': [restecg], 'thalach': [thalach], 'exang': [exang],
+        'oldpeak': [oldpeak], 'slope': [slope], 'ca': [ca], 'thal': [thal]
+    })
+    
+    # Scale the data
+    user_data_scaled = scaler.transform(user_data)
+    
+    # Get prediction
+    prediction = model.predict(user_data_scaled)
+    
+    # Show result
+    if prediction[0] == 1:
+        st.error("⚠️ HIGH RISK: The model predicts potential Heart Disease.")
+        st.write("Please consult a doctor.")
+    else:
+        st.success("✅ LOW RISK: The model predicts a Healthy Heart.")
+        st.write("Keep maintaining a healthy lifestyle!")
