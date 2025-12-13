@@ -54,8 +54,9 @@ with col2:
 
 st.markdown("---")
 
-# --- 4. INPUT FORM ---
+# --- 4. INPUT FORM (Organized by Medical Category) ---
 
+# We use columns and containers to make it look like a medical form
 with st.container():
     st.subheader("📝 Patient Information")
     
@@ -68,7 +69,7 @@ with st.container():
     with col3:
         sex = st.selectbox("Sex", (1, 0), format_func=lambda x: "Male" if x == 1 else "Female")
 
-    # GROUP 2: VITALS
+    # GROUP 2: VITALS (Expandable for cleaner look)
     with st.expander("🩺 Vitals & Blood Work (Click to Expand)", expanded=True):
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -92,8 +93,7 @@ with st.container():
                                    format_func=lambda x: ["Normal", "ST-T Abnormality", "LV Hypertrophy"][x])
             slope = st.selectbox("ST Slope", (0, 1, 2), format_func=lambda x: ["Upsloping", "Flat", "Downsloping"][x])
         with c3:
-            # We use format="%.2f" here to ensure the input box shows 1.10 instead of 1.0999
-            oldpeak = st.number_input("ST Depression", 0.0, 10.0, 0.0, step=0.1, format="%.2f")
+            oldpeak = st.number_input("ST Depression", 0.0, 10.0, 0.0, step=0.1)
             ca = st.slider("Major Vessels (Fluoroscopy)", 0, 3, 0)
             thal = st.selectbox("Thalassemia", (0, 1, 2, 3), format_func=lambda x: ["Null", "Fixed Defect", "Normal", "Reversable"][x])
 
@@ -109,14 +109,14 @@ st.markdown("---")
 # --- 5. REPORT SUMMARY & PREDICTION ---
 st.subheader(f"📊 Assessment Summary for {name}")
 
+# Use Metrics for a dashboard feel
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Blood Pressure", f"{trestbps} mm Hg", delta_color="inverse")
 m2.metric("Cholesterol", f"{chol} mg/dl", delta_color="inverse")
 m3.metric("Max Heart Rate", f"{thalach} bpm")
-# Showing ST Depression formatted nicely to 2 decimal places (e.g., 1.10)
-m4.metric("ST Depression", f"{oldpeak:.2f}") 
+m4.metric("Chest Pain", ["Typical", "Atypical", "Non-anginal", "Asymptomatic"][cp])
 
-st.markdown("<br>", unsafe_allow_html=True) 
+st.markdown("<br>", unsafe_allow_html=True) # Spacer
 
 # PREDICT BUTTON
 if st.button("RUN DIAGNOSTIC MODEL"):
@@ -125,16 +125,19 @@ if st.button("RUN DIAGNOSTIC MODEL"):
     
     # Predict
     prediction = model.predict(input_scaled)
+    prob = model.predict_proba(input_scaled)
+    risk_score = prob[0][1] * 100
     
-    # DISPLAY RESULT (Simplified)
+    # DISPLAY RESULT
     if prediction[0] == 1:
         st.error(f"⚠️ **HIGH RISK DETECTED**")
         st.markdown(f"""
             <div style="background-color: #ffcccc; padding: 20px; border-radius: 10px; border-left: 5px solid #ff0000;">
                 <h3 style="color: #990000;">Diagnosis: Positive for Heart Disease</h3>
-                <p>The model has detected patterns consistent with heart disease.</p>
+                <p>The model estimates a <strong>{risk_score:.1f}% probability</strong> of heart disease.</p>
                 <ul>
                     <li><strong>Action Required:</strong> Please schedule a cardiology consultation immediately.</li>
+                    <li><strong>Key Factors:</strong> Check Cholesterol ({chol}) and ST Depression ({oldpeak}).</li>
                 </ul>
             </div>
         """, unsafe_allow_html=True)
@@ -143,7 +146,7 @@ if st.button("RUN DIAGNOSTIC MODEL"):
         st.markdown(f"""
             <div style="background-color: #d4edda; padding: 20px; border-radius: 10px; border-left: 5px solid #28a745;">
                 <h3 style="color: #155724;">Diagnosis: Negative (Healthy)</h3>
-                <p>The model has not detected significant signs of heart disease.</p>
+                <p>The model estimates a <strong>{(100-risk_score):.1f}% probability</strong> of a healthy heart.</p>
                 <ul>
                     <li><strong>Action Required:</strong> Maintain healthy lifestyle and routine checkups.</li>
                 </ul>
